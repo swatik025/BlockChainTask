@@ -1,0 +1,138 @@
+#
+# Copyright IBM Corp. All Rights Reserved.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+version: '2'
+
+services:
+
+  ca.org1.manufacturer.com:
+    image: hyperledger/fabric-ca
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-manufacturer
+      - FABRIC_CA_SERVER_CA_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.org1.manufacturer.com-cert.pem
+      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/ORG1_PRIVATE_KEY
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.org1.manufacturer.com-cert.pem
+      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/ORG1_PRIVATE_KEY
+    ports:
+      - "7054:7054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ./channel/crypto-config/peerOrganizations/org1.manufacturer.com/ca/:/etc/hyperledger/fabric-ca-server-config
+    container_name: ca_peerManufacturer
+
+  ca.org2.dealer.com:
+    image: hyperledger/fabric-ca
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-dealer
+      - FABRIC_CA_SERVER_CA_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.org2.dealer.com-cert.pem
+      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/ORG2_PRIVATE_KEY
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.org2.dealer.com-cert.pem
+      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/ORG2_PRIVATE_KEY
+    ports:
+      - "8054:7054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ./channel/crypto-config/peerOrganizations/org2.dealer.com/ca/:/etc/hyperledger/fabric-ca-server-config
+    container_name: ca_peerDealer
+
+  ca.org3.customer.com:
+    image: hyperledger/fabric-ca
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-customer
+      - FABRIC_CA_SERVER_CA_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.org3.customer.com-cert.pem
+      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/ORG3_PRIVATE_KEY
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.org3.customer.com-cert.pem
+      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/ORG3_PRIVATE_KEY
+    ports:
+      - "9054:7054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ./channel/crypto-config/peerOrganizations/org3.customer.com/ca/:/etc/hyperledger/fabric-ca-server-config
+    container_name: ca_peerCustomer
+
+  orderer.example.com:
+    container_name: orderer.example.com
+    image: hyperledger/fabric-orderer
+    environment:
+      - FABRIC_LOGGING_SPEC=debug
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/etc/hyperledger/configtx/genesis.block
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/etc/hyperledger/crypto/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/etc/hyperledger/crypto/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/etc/hyperledger/crypto/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/etc/hyperledger/crypto/orderer/tls/ca.crt, /etc/hyperledger/crypto/peerOrg1/tls/ca.crt, /etc/hyperledger/crypto/peerOrg2/tls/ca.crt, /etc/hyperledger/crypto/peerOrg3/tls/ca.crt]
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/orderers
+    command: orderer
+    ports:
+      - 7050:7050
+    volumes:
+        - ./channel:/etc/hyperledger/configtx
+        - ./channel/crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/:/etc/hyperledger/crypto/orderer
+        - ./channel/crypto-config/peerOrganizations/org1.manufacturer.com/peers/peer0.org1.manufacturer.com/:/etc/hyperledger/crypto/peerOrg1
+        - ./channel/crypto-config/peerOrganizations/org2.dealer.com/peers/peer0.org2.dealer.com/:/etc/hyperledger/crypto/peerOrg2
+        - ./channel/crypto-config/peerOrganizations/org3.customer.com/peers/peer0.org3.customer.com/:/etc/hyperledger/crypto/peerOrg3
+
+  peer0.org1.manufacturer.com:
+    container_name: peer0.org1.manufacturer.com
+    extends:
+      file:   base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org1.manufacturer.com
+      - CORE_PEER_LOCALMSPID=ManufacturerMSP
+      - CORE_PEER_ADDRESS=peer0.org1.manufacturer.com:7051      
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org1.manufacturer.com:7051
+    ports:
+      - 7051:7051
+      - 7053:7053
+    volumes:
+        - ./channel/crypto-config/peerOrganizations/org1.manufacturer.com/peers/peer0.org1.manufacturer.com/:/etc/hyperledger/crypto/peer
+    depends_on:
+      - orderer.example.com
+
+  peer0.org2.dealer.com:
+    container_name: peer0.org2.dealer.com
+    extends:
+      file:   base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org2.dealer.com
+      - CORE_PEER_LOCALMSPID=DealerMSP
+      - CORE_PEER_ADDRESS=peer0.org2.dealer.com:7051     
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org2.dealer.com:7051
+    ports:
+      - 8051:7051
+      - 8053:7053
+    volumes:
+        - ./channel/crypto-config/peerOrganizations/org2.dealer.com/peers/peer0.org2.dealer.com/:/etc/hyperledger/crypto/peer
+    depends_on:
+      - orderer.example.com
+
+  peer0.org3.customer.com:
+    container_name: peer0.org3.customer.com
+    extends:
+      file:   base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.org3.customer.com
+      - CORE_PEER_LOCALMSPID=CustomerMSP
+      - CORE_PEER_ADDRESS=peer0.org3.customer.com:7051      
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org3.customer.com:7051
+    ports:
+      - 9051:7051
+      - 9053:7053
+    volumes:
+        - ./channel/crypto-config/peerOrganizations/org3.customer.com/peers/peer0.org3.customer.com/:/etc/hyperledger/crypto/peer
+    depends_on:
+      - orderer.example.com
